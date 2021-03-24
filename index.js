@@ -19,40 +19,32 @@
   const sunset3 = {r: 83, g: 50,b: 86};
   const sunset4 = {r:157, g:50, b:4};
   const sunset5 = {r:12, g:18, b:44}; // this is the ground
-  
-  // star path
-  const starCoords = [
-    -2, 0,
-    -0.4367816092, 0.275862069, // g /** */
-    -0.7, 0.7,
-    -0.275862069, 0.4367816092, // f /** */
-    0, 2,
-    0.275862069, 0.4367816092, // k /** */
-    0.7, 0.7,
-    0.4367816092, 0.275862069, // l /** */
-    2, 0,
-    0.4367816092, -0.275862069, // j /** */
-    0.7, -0.7,
-    0.275862069, -0.4367816092, // i /** */
-    0, -2,
-    -0.275862069, -0.4367816092, // n /** */
-    -0.7, -0.7,
-    -0.4367816092, -0.275862069 // h /** */
-  ];
 
-
-
+  const starSpawns =
+    [ 367, 143,
+      486, 236,
+      826, 197,
+      491, 505,
+      295, 314,
+       98, 481,
+      214, 931,
+      412, 613,
+      655, 820,
+     1026, 332,
+     1275,  70,
+      910, 535 ];
 
   const domBody = document.body;
   
   const CALLS_PER_SECOND = 33;
   const MILLISECONDS_PER_SECOND = 1000;
-  const DELAY_PER_INTERVAL_CALL = MILLISECONDS_PER_SECOND / CALLS_PER_SECOND;
+  const DELAY_PER_CALL = MILLISECONDS_PER_SECOND / CALLS_PER_SECOND;
   
   window.onload = function() {            
     init();
-
-    setInterval(updateGradient, DELAY_PER_INTERVAL_CALL);
+    
+    // this creates "intervals" and executes them repeatedly every amount of ms
+    setInterval(updateGradient, DELAY_PER_CALL);
   }
 
   var canvas;
@@ -61,11 +53,13 @@
     canvas = document.getElementById("main-canvas");
     canvas.style.border = `${CANVAS_BORDER_PIXELS}px solid ${CANVAS_BORDER_COLOR}`;
     context = canvas.getContext('2d');
-    makeCanvasWholeScreen();
 
+    makeCanvasWholeScreen();
     domBody.onresize = () => makeCanvasWholeScreen();
 
-    
+    document.addEventListener("click", (evt) => {
+      console.log(evt.clientX+"  "+evt.clientY);
+    });
   }
   function makeCanvasWholeScreen() {
     canvas.width = window.innerWidth - CANVAS_BORDER_PIXELS * 2;
@@ -74,8 +68,6 @@
 
   var gradient;
   function updateGradient() {
-    // sky
-    
     var skyA = lerpColor(sunset1, sunrise1, normalizedCosineWave); // higher sky
     var skyB = lerpColor(sunset2, sunrise2,  normalizedCosineWave);
     var skyC = lerpColor(sunset3, sunrise3,  normalizedCosineWave);
@@ -100,8 +92,12 @@
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
+    
+
     // star
-    drawStar({ x: canvas.width/2, y: canvas.height/2}, {x: 5 * normalizedCosineWave, y: 5 * normalizedCosineWave});
+    for (let i = 0; i < starSpawns.length - 1; i += 2) {
+      drawStar({ x: starSpawns[i], y: starSpawns[i+1] }, { x: inverseCosineWave, y: inverseCosineWave });
+    }
     
     animateCosineWave(DAY_NIGHT_DURATION_IN_SECONDS);
   }
@@ -121,6 +117,7 @@
   const TAU = 6.283185307179586;
   var angle = 0;
   var normalizedCosineWave = 0;
+  var inverseCosineWave = 1;
   var timeStart;
   function animateCosineWave(halfAPeriodDuration = 5) {
     halfAPeriodDuration *= 2;
@@ -132,6 +129,7 @@
     
     const cos = Math.cos(angle)
     normalizedCosineWave = (1 + cos) / 2; // this is done to make cosine function go through { 1, 0, 1 } instead of { 1, -1, 1} (normalization to unitary value)
+    inverseCosineWave = 1 - normalizedCosineWave;
     
     const angleIncrementPerIteration = 1 / (CALLS_PER_SECOND * halfAPeriodDuration) * TAU;
     angle += angleIncrementPerIteration;
@@ -159,17 +157,43 @@
 
   // draw methods
   function drawStar(location, scale) {
-    context.lineWidth= "5";
+    //console.log(`drawing at ${Object.values(location)} with scale ${Object.values(scale)}`);
+    const starLocalCoords = [
+      -2, 0,
+      -0.4367816092, 0.275862069, // g 
+      -0.7, 0.7,
+      -0.275862069, 0.4367816092, // f 
+      0, 2,
+      0.275862069, 0.4367816092, // k 
+      0.7, 0.7,
+      0.4367816092, 0.275862069, // l
+      2, 0,
+      0.4367816092, -0.275862069, // j
+      0.7, -0.7,
+      0.275862069, -0.4367816092, // i 
+      0, -2,
+      -0.275862069, -0.4367816092, // n
+      -0.7, -0.7,
+      -0.4367816092, -0.275862069 // h
+    ];
+    const LOWEST_RANDOM_INCLUSIVE = 4;
+    const INCLUSIVE_RANGE = 2;
+    context.lineWidth = Math.floor(Math.random() * INCLUSIVE_RANGE) + LOWEST_RANDOM_INCLUSIVE;
     context.strokeStyle = "white";
     context.fillStyle = "white";
-    drawShape(location.x, location.y, scale.x, scale.y, starCoords);
+    drawShape(location.x, location.y, scale.x, scale.y, starLocalCoords);
   }
   function drawShape(x, y, xScale, yScale, coords) {
+    const firstCoord = { x: x + (coords[0] * xScale), y: y + (coords[1] * yScale) };
+    const scaleMultiplier = (xScale + yScale) / 2;
+    context.lineWidth = context.lineWidth * scaleMultiplier;
     context.beginPath();
-    context.moveTo(x + (coords[0] * xScale), y + (coords[1] * yScale));
+    context.moveTo(firstCoord.x, firstCoord.y);
+
     for (let xIndex = 2; xIndex < coords.length; xIndex += 2) {
       let yIndex = xIndex + 1;
-      context.lineTo(x + (coords[xIndex] * xScale), y + (coords[yIndex] * yScale));
+      const nextCoord = { x: x + (coords[xIndex] * xScale), y: y + (coords[yIndex] * yScale) };
+      context.lineTo(nextCoord.x, nextCoord.y);
     }
     context.closePath();
     context.stroke();
