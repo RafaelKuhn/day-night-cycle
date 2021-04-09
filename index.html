@@ -1,26 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Workbench</title>
   <link rel="stylesheet" type="text/css" href="style.css" />
-  
+
 </head>
+
 <body>
 
   <div id="wrapper">
 
     <canvas id="main-canvas"></canvas>
-    <div id="inner">
-      <p id="text-in-the-skies">"One often meets his destiny on the road he takes to avoid it."<br/>- Oogway.</p>
+    <div id="top-container">
+      <p>"One often meets his destiny on the road he takes to avoid it."<br />- Oogway.</p>
     </div>
-    
+    <p id="lower-text">remaining stars: <span id="star-count"></span></p>
+
+    <div id="win-pannel" class="inactive">
+      <p id="win-text">you won! <br/>🥳<br/></p>
+      <p id="restart-text">press R to restart</p>
+    </div>
+
   </div>
 
-  <img src="earth1024x1024-64frames.png" id="earth" class="inactive">
+  <!-- <img src="earth1024x1024-64frames.png" id="earth" class="inactive"> -->
   <script type="application/javascript" src="index.js"></script>
 
 </body>
+
 </html>
