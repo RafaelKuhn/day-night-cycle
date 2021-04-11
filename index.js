@@ -1,24 +1,15 @@
 // public scope
-var canRestart = false;
-var isPaused = false;
-var isRestartting = false;
-function restartGame() {
-  if (!canRestart) {
-    return;
-  }
-
-  document.getElementById("win-pannel").classList.add("inactive");
-  isPaused = false;
-  canRestart = false;
-  isRestartting = true;
-}
+var game = {};
+game.restart = () => {};
 
 // game
 (function() {
   // globals
   const DAY_NIGHT_DURATION_IN_SECONDS = 5;
-  const CANVAS_BORDER_PIXELS = 0;
-  const CANVAS_BORDER_COLOR = 'black';
+
+  // hard : 4
+  // medium: 6.7
+  // easy: 8
 
   // colors
   const sun = { r: 249, g: 215, b: 28 };
@@ -72,11 +63,14 @@ function restartGame() {
   
   // dom
   const domBody = document.body;
-  /** @type HTMLElement */ var domCanvas;
-  /** @type HTMLElement */ var ctx;
-  /** @type HTMLElement */ var domRemainingStars;
+  var domCanvas;
+  var ctx;
+  var domRemainingStars;
 
   // game variables
+  var isPaused = false;
+  var canRestart = false;
+  var isRestartting = false;
   var allActiveStars = [];
   var clickableStarRadius = 0;
   var remainingStarCount = 0;
@@ -135,40 +129,31 @@ function restartGame() {
     static rotatePoint(point, angle, pivot = Vector2.zero) {
       const sin = Math.sin(angle);
       const cos = Math.cos(angle);
-  
-      // translate pivot of point to origin:
       point.x -= pivot.x;
       point.y -= pivot.y;
-
-      // rotate point
       var xnew = point.x * cos - point.y * sin;
       var ynew = point.x * sin + point.y * cos;
-
-      // translate point pivot back:
       xnew += pivot.x;
       ynew += pivot.y;
-
       return new Vector2(xnew, ynew);
     }
     
     /** @param {Vector2} pointA @param {Vector2} pointB */
     static distance(pointA, pointB) {
-      // if (pointA.x == pointB.x && pointA.y == pointB.y) {
-      //   return 0;
-      // }
       return Math.sqrt((pointA.x-pointB.x)**2 + (pointA.y-pointB.y)**2 );
     }
   }
   
   window.onload = function() {            
-    init();
+    initGame();
     setInterval(updateCanvas, DELAY_PER_CALL); // this creates "intervals" and executes them repeatedly every amount of ms
   }
 
-  function init() {
+  function initGame() {
     // game variables
     normalizedCos = 1;
     isDay = true;
+    exposeGameVariableToHTML();
 
     // star instances
     for (let i = 0; i < starSpawnCoordinates.length - 1; i += 2) {
@@ -180,7 +165,6 @@ function restartGame() {
 
     // elements
     domCanvas = document.getElementById("main-canvas");
-    domCanvas.style.border = `${CANVAS_BORDER_PIXELS}px solid ${CANVAS_BORDER_COLOR}`;
     ctx = domCanvas.getContext('2d');
     domRemainingStars = document.getElementById("star-count");
     domRemainingStars.innerHTML = "?";
@@ -204,8 +188,8 @@ function restartGame() {
     onMorning();
   }
   function makeCanvasWholeScreen() {
-    domCanvas.width = window.innerWidth - CANVAS_BORDER_PIXELS * 2;
-    domCanvas.height = window.innerHeight - CANVAS_BORDER_PIXELS * 2;
+    domCanvas.width = document.body.clientWidth;
+    domCanvas.height = document.body.clientHeight;
   }
 
   var gradient;
@@ -383,16 +367,17 @@ function restartGame() {
     allActiveStars.forEach( (star) => {
       const distanceToStar = Vector2.distance(clickPos, star.position);
       
-      const isClickOverAStar = distanceToStar < clickableStarRadius;
-      if (isClickOverAStar) {
-        
-        const isStarAlreadyClicked = star.isSpinning;
-        if (isStarAlreadyClicked) {
-          return;
-        }
-
-        clickStar(star);
+      const isClickNotOverThisStar = distanceToStar < clickableStarRadius == false;
+      if (isClickNotOverThisStar) {
+        return;
       }
+        
+      const hasStarAlreadyBeenClicked = star.isSpinning;
+      if (hasStarAlreadyBeenClicked) {
+        return;
+      }
+
+      clickStar(star);
     });
   }
 
@@ -404,16 +389,18 @@ function restartGame() {
     resetDomToDaytime();
     setStarsToBlink();
     resetStarCounter();
-    
   }
 
   function onDawn() {
     updateDom();
     setStarsToBlink();
-    //console.log("can click stars");
   }
   
   // game methods
+  function exposeGameVariableToHTML() {
+    game.restart = () => { restartGame(); }
+  }
+
   function clickStar(star) {
     star.startSpinning();
     remainingStarCount--;
@@ -442,9 +429,17 @@ function restartGame() {
   function win() {
     isPaused = true;
     canRestart = true;
-    console.log("you won");
     document.getElementById("win-pannel").classList.remove("inactive");
   }
 
-
+  function restartGame() {
+    if (!canRestart) {
+      return;
+    }
+  
+    document.getElementById("win-pannel").classList.add("inactive");
+    isPaused = false;
+    canRestart = false;
+    isRestartting = true;
+  }
 })();

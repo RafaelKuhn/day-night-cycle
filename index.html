@@ -3,11 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Workbench</title>
+  <title>star-clicker</title>
   <link rel="stylesheet" type="text/css" href="style.css" />
-
 </head>
 
 <body>
@@ -20,9 +17,10 @@
     </div>
     <p id="lower-text">remaining stars: <span id="star-count"></span></p>
 
-    <div id="win-pannel" class="inactive">
+    <div id="win-pannel" class="inactive"> 
       <p id="win-text">you won! <br/>🥳<br/></p>
-      <p id="restart-text">press R to restart</p>
+      <button id="restart-button" type="button" onclick="game.restart();" value="algo"><p>Restart</p></button>
+      <p id="restart-text">click or press R</p>
     </div>
 
   </div>
