@@ -62,32 +62,33 @@ game.restart = () => {};
   ];
   
   // dom
-  const domBody = document.body;
-  var domCanvas;
-  var ctx;
-  var domRemainingStars;
+  /** @type {HTMLCanvasElement} */ var domCanvas;
+  /** @type {CanvasRenderingContext2D} */ var ctx;
+  /** @type {HTMLElement} */ var domRemainingStars;
 
   // game variables
   var isPaused = false;
   var canRestart = false;
   var isRestartting = false;
-  var allActiveStars = [];
-  var clickableStarRadius = 0;
+  /** @type {Star[]} */ var allActiveStars = [];
+  var starHitboxSize = 0;
   var remainingStarCount = 0;
 
   // actual constants
+  const TAU = 6.283185307179586;
+  const MILLISECONDS_PER_SECOND = 1000;
   const UNIT_SIZE_IN_PIXELS = 25;
   const NIGHT_DAY_RATIO = 0.75; // % of the time stars will be clickable, around night
-  const TAU = 6.283185307179586;
+  const DEFAULT_LINE_WIDTH = 5;
   const CALLS_PER_SECOND = 33;
-  const MILLISECONDS_PER_SECOND = 1000;
   const DELAY_PER_CALL = MILLISECONDS_PER_SECOND / CALLS_PER_SECOND;
 
   // classes
   class Star {
     #status = "none"; #isBlinking; #isSpinning; 
     /** @type {Vector2} */ #position;
-    rotation = 0;
+    /** @type {number} rotation in radians */ rotation = 0;
+    /** @type {boolean} */ isMouseOver = false;
     
     /** @param {Vector2} position */
     constructor(position) {
@@ -167,22 +168,14 @@ game.restart = () => {};
     domCanvas = document.getElementById("main-canvas");
     ctx = domCanvas.getContext('2d');
     domRemainingStars = document.getElementById("star-count");
-    domRemainingStars.innerHTML = "?";
 
     // canvas
     makeCanvasWholeScreen();
-    domBody.onresize = () => makeCanvasWholeScreen();
 
     // listeners
-    document.addEventListener("click", (evt) => {
-      onMouseClick(new Vector2(evt.clientX, evt.clientY));
-    });
-
-    document.addEventListener("keypress", (evt) => {
-      if(evt.key === "r") {
-        onKeyboardRPressed();
-      }
-    });
+    document.addEventListener("keypress", (keyboardEvt) => onKeyboardPressed(keyboardEvt));
+    domCanvas.addEventListener("click", (mouseEvt) => onMouseClick(mouseEvt));
+    domCanvas.addEventListener("mousemove", (mouseEvt) => onMouseMove(mouseEvt));
 
     // init game
     onMorning();
@@ -233,7 +226,7 @@ game.restart = () => {};
     for (const starIndex in allActiveStars) {
       const star = allActiveStars[starIndex];
       drawStar(star, inverseCos);
-      clickableStarRadius = UNIT_SIZE_IN_PIXELS * inverseCos;
+      starHitboxSize = UNIT_SIZE_IN_PIXELS * inverseCos;
     }
    
     const canTurnToNight = normalizedCos < NIGHT_DAY_RATIO && isDay;
@@ -299,20 +292,25 @@ game.restart = () => {};
   function drawStar(star, scale) {
     const LOWEST_RANDOM_INCLUSIVE = 4;
     const INCLUSIVE_RANGE = 2;
-
-    ctx.strokeStyle = "white";
-    ctx.fillStyle = "white";
     
     const pos = star.position;
     if (star.isBlinking) {
       const rand = Math.floor(Math.random() * INCLUSIVE_RANGE) + LOWEST_RANDOM_INCLUSIVE;
+      ctx.strokeStyle = "white";
+      ctx.fillStyle = "white";
       ctx.lineWidth = rand * scale; // means 4 to 6
       
       drawShape(pos, starLocalCoordinates, scale, scale);
     } else {
-      ctx.lineWidth = 5;
+      ctx.lineWidth = DEFAULT_LINE_WIDTH;
       star.rotation += TAU * 0.1;
-      drawShape(pos, starLocalCoordinates, scale*1.2, scale*1.2, star.rotation);
+
+      const color = `rgba(220, 220, 130, 1)`;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+
+      const scaleMult = 1.2;
+      drawShape(pos, starLocalCoordinates, scale * scaleMult, scale * scaleMult, star.rotation);
     }
 
   }
@@ -321,11 +319,11 @@ game.restart = () => {};
     const x = shapePiv.x;
     const y = shapePiv.y;
 
-    const hasNoRotation = rotation === 0;
+    const hasRotation = rotation === 0 == false;
 
     var nextCoord = new Vector2(x + (coords[0] * xScale), y + (coords[1] * yScale));
 
-    const firstCoord = hasNoRotation ?  nextCoord : Vector2.rotatePoint(nextCoord, rotation, shapePiv);
+    const firstCoord = hasRotation ?  Vector2.rotatePoint(nextCoord, rotation, shapePiv) : nextCoord;
     const scaleMultiplier = (xScale + yScale) / 2;
     ctx.lineWidth *= scaleMultiplier;
     ctx.beginPath();
@@ -337,7 +335,7 @@ game.restart = () => {};
       nextCoord.x = x + (coords[xIndex] * xScale);
       nextCoord.y = y + (coords[yIndex] * yScale);
 
-      if (!hasNoRotation) {
+      if (hasRotation) {
         nextCoord = Vector2.rotatePoint(nextCoord, rotation, shapePiv);
       }
       
@@ -348,70 +346,86 @@ game.restart = () => {};
     ctx.fill();
   }
 
-  function drawArc(position, radius) {
-    var previousWidth = ctx.lineWidth;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(position.x, position.y, radius, 0, TAU);
-    ctx.stroke();
-    ctx.lineWidth = previousWidth;
-  }
-
   // events
-  /** @param {Vector2} clickPos */
-  function onMouseClick(clickPos) {
-    if (isDay) {
-      return;
-    }
-    
-    allActiveStars.forEach( (star) => {
-      const distanceToStar = Vector2.distance(clickPos, star.position);
-      
-      const isClickNotOverThisStar = distanceToStar < clickableStarRadius == false;
-      if (isClickNotOverThisStar) {
-        return;
-      }
-        
-      const hasStarAlreadyBeenClicked = star.isSpinning;
-      if (hasStarAlreadyBeenClicked) {
-        return;
-      }
+  /** @param {MouseEvent} event */
+  function onMouseMove(event) {
+    const mousePosition =  new Vector2(event.clientX, event.clientY);
 
-      clickStar(star);
+    var isMouseOverAnyStar = false;
+
+    allActiveStars.forEach( (star) => {
+      if (star.isBlinking) {
+        const distanceToStar = Vector2.distance(mousePosition, star.position);
+
+        star.isMouseOver = distanceToStar < starHitboxSize;
+        isMouseOverAnyStar = isMouseOverAnyStar || star.isMouseOver;
+      }
     });
+
+    domCanvas.style.cursor = isMouseOverAnyStar ? "pointer" : "default";
   }
 
-  function onKeyboardRPressed() {
-    restartGame();
+  /** @param {MouseEvent} event */
+  function onMouseClick(event) {
+    if (isDay) return;
+
+    const mousePosition = new Vector2(event.clientX, event.clientY);
+    allActiveStars.forEach( (star) => attemptToClickStarAt(star, mousePosition) );
+  }
+
+  /** @param {KeyboardEvent} event */
+  function onKeyboardPressed(event) {
+    const isKeyR = event.key === "r";
+
+    if (isKeyR) restartGame();
   }
 
   function onMorning() {
     resetDomToDaytime();
-    setStarsToBlink();
+    resetAllStarsToBlinking();
     resetStarCounter();
   }
 
   function onDawn() {
     updateDom();
-    setStarsToBlink();
+    resetAllStarsToBlinking();
   }
   
   // game methods
   function exposeGameVariableToHTML() {
-    game.restart = () => { restartGame(); }
+    game.restart = () => restartGame();
   }
 
+  /** @param {Star} star */
+  /** @param {Vector2} mousePosition */
+  function attemptToClickStarAt(star, mousePosition) {
+    const distanceToStar = Vector2.distance(mousePosition, star.position);
+      
+    const isClickNotOverThisStar = distanceToStar < starHitboxSize == false;
+    if (isClickNotOverThisStar) return;
+        
+    const hasStarAlreadyBeenClicked = star.isSpinning;
+    if (hasStarAlreadyBeenClicked) return;
+    
+    clickStar(star);
+  }
+
+  /** @param {Star} star */
   function clickStar(star) {
     star.startSpinning();
     remainingStarCount--;
-    if (remainingStarCount === 0) {
-      win();
-    }
     updateDom();
+    resetCursorToDefault();
+
+    const areAllStarsClicked = remainingStarCount === 0;
+    if (areAllStarsClicked) win();
   }
 
-  function setStarsToBlink() {
-    allActiveStars.forEach( (star) => star.startBlinking() );
+  function resetAllStarsToBlinking() {
+    allActiveStars.forEach((star) => {
+      star.startBlinking();
+      star.rotation = 0;
+    });
   }
 
   function resetDomToDaytime() {
@@ -426,6 +440,10 @@ game.restart = () => {};
     remainingStarCount = allActiveStars.length;;
   }
 
+  function resetCursorToDefault() {
+    domCanvas.style.cursor = "default";
+  }
+
   function win() {
     isPaused = true;
     canRestart = true;
@@ -433,9 +451,8 @@ game.restart = () => {};
   }
 
   function restartGame() {
-    if (!canRestart) {
-      return;
-    }
+    const cannotRestart = !canRestart;
+    if (cannotRestart) return;
   
     document.getElementById("win-pannel").classList.add("inactive");
     isPaused = false;
