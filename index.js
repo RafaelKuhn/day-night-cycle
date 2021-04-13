@@ -291,11 +291,11 @@ game.restart = () => {};
   /** @param {Star} star @param {number} scale */
   function drawStar(star, scale) {
     const LOWEST_RANDOM_INCLUSIVE = 4;
-    const INCLUSIVE_RANGE = 2;
+    const INCLUSIVE_RANGE = 1;
     
     const pos = star.position;
     if (star.isBlinking) {
-      const rand = Math.floor(Math.random() * INCLUSIVE_RANGE) + LOWEST_RANDOM_INCLUSIVE;
+      const rand = Math.round(Math.random() * INCLUSIVE_RANGE) + LOWEST_RANDOM_INCLUSIVE;
       ctx.strokeStyle = "white";
       ctx.fillStyle = "white";
       ctx.lineWidth = rand * scale; // means 4 to 6
